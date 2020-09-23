@@ -43,3 +43,34 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+
+"""
+#to display circle by taking center interactively from the user
+
+def draw_circle(event, x, y, flags, param):
+
+    global center, clicked
+    if event == cv2.EVENT_LBUTTONDOWN:
+        center=(x,y)
+        clicked=False
+    if event == cv2.EVENT_LBUTTONUP:
+        clicked =True
+
+center =(0,0)
+clicked = False
+
+cap= cv2.VideoCapture(0)
+cv2.namedWindow('testing')
+cv2.setMouseCallback('testing',draw_circle)
+
+while True:
+    ret, frame =cap.read()
+    if clicked:
+        cv2.circle(frame,center=center,radius=50,color=(255,0,255), thickness=3)
+    cv2.imshow('frame',frame)
+    if cv2.waitKey(5) & 0xFF == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+"""
