@@ -1,31 +1,71 @@
+from threading import Thread
+from collections import deque
 import cv2
-cap=cv2.VideoCapture(0)
-cap.set(3,640)
-cap.set(4,480)
-cap.set(10,100)
-while True:
-    ret,frame=cap.read()
-    if ret is False:
-        break
-    roi=frame [50:240,:380]
-    rows,cols,_=roi.shape
-    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-    gray_roi=cv2.GaussianBlur(gray_roi,(7,7),0)
-    _,threshold=cv2.threshold(gray_roi,3,255,cv2.THRESH_BINARY_INV)
-    contours,_=cv2.findContours(threshold,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    contours=sorted(contours,key=lambda x:cv2.contourArea(x),reverse=True)
-    for cnt in contours:
-        (x,y,w,h)=cv2.boundingRect(cnt)
-        #cv2.drawContours(roi,[cnt],-1,(0,0,255),3)
-        cv2.rectangle(roi,(x,y),(x+w,y+h),(255,0,0),2)
-        cv2.line(roi,(x+int(w/2),0),(x+int(w/2),rows),(0,255,0),2)
-        cv2.line(roi,(0,y+int(h/2)),(cols,y+int(h/2)),(0,255,0),2)
-        break
-    cv2.imshow("thr",threshold)
-    cv2.imshow("Grayroi",gray_roi)
-    cv2.imshow("roi",roi)
-    key=cv2.waitKey(30)
-    if key==27:
-        break
 
-cv2.destroyAllWindows()
+
+class VideoGet:
+    """
+    Class that continuously gets frames from a VideoCapture object
+    with a dedicated thread.
+    """
+
+    def __init__(self, src=0):
+        self.movie = cv2.VideoCapture(src)
+        self.fps = self.movie.get(cv2.CAP_PROP_FPS)
+        self.grabbed = deque()
+        self.frame = deque()
+        g, f = self.movie.read()
+        self.grabbed.append(g)
+        self.frame.append(f)
+        self.stopped = False
+
+    def start(self):
+        Thread(target=self.get, args=()).start()
+        return self
+
+    def get(self):
+        while not self.stopped:
+            g, f = self.movie.read()
+            if not g:
+                self.stop()
+            else:
+                self.frame.append(f)
+                self.grabbed.append(g)
+
+    def get_frame(self):
+        if len(self.grabbed) != 0:
+            g = self.grabbed.popleft()
+            f = self.frame.popleft()
+            return g, f
+
+    def stop(self):
+        self.stopped = True
+
+
+def threadVideoGet(source):
+    """
+    Dedicated thread for grabbing video frames with VideoGet object.
+    Main thread shows video frames.
+    """
+
+    video_getter = VideoGet(source).start()
+    # cps = CountsPerSec().start()
+    # print(video_getter.fps)
+
+    while True:
+        usr = cv2.waitKey(int(1000))
+        if usr == 27 or video_getter.stopped:
+            video_getter.stop()
+            break
+        # if (cv2.waitKey(int(1000 / video_getter.fps)) == ord("q")) or video_getter.stopped:
+        #    video_getter.stop()
+        #    break
+
+        grabbed, frame = video_getter.get_frame()
+        # frame = putIterationsPerSec(frame, cps.countsPerSec())
+        cv2.imshow("Video", frame)
+        # cps.increment()
+
+
+path = '/home/devil/Downloads/video.mp4'
+threadVideoGet(path)
