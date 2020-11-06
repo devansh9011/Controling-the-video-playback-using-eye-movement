@@ -1,18 +1,50 @@
 import cv2
 import time
 import numpy as np
+from datetime import datetime
+from threading import Thread
 
-# import matplotlib.pyplot as plt
+face_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 
-face_cascade = cv2.CascadeClassifier(
-    "/home/devil/PycharmProjects/venv/lib/python3.8/site-packages/cv2/data/haarcascade_frontalface_default.xml")
-eye_cascade = cv2.CascadeClassifier(
-    '/home/devil/PycharmProjects/venv/lib/python3.8/site-packages/cv2/data/haarcascade_eye.xml')
+
+class CountsPerSec:
+    """
+    Class that tracks the number of occurrences ("counts") of an
+    arbitrary event and returns the frequency in occurrences
+    (counts) per second. The caller must increment the count.
+    """
+
+    def __init__(self):
+        self._start_time = None
+        self._num_occurrences = 0
+
+    def start(self):
+        self._start_time = datetime.now()
+        return self
+
+    def increment(self):
+        self._num_occurrences += 1
+
+    def countsPerSec(self):
+        elapsed_time = (datetime.now() - self._start_time).total_seconds()
+        return self._num_occurrences / elapsed_time
+
+
+def putIterationsPerSec(frame, iterations_per_sec):
+    """
+    Add iterations per second text to lower-left corner of a frame.
+    """
+
+    cv2.putText(frame, "{:.0f} iterations/sec".format(iterations_per_sec),
+        (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255))
+    return frame
 
 
 class webcam:
     def __init__(self):
         self.cap = cv2.VideoCapture(0)
+        self.cps = CountsPerSec().start()
 
     def detect_face(self):
         ret, frame = self.cap.read()
@@ -27,7 +59,9 @@ class webcam:
             eyes_rectangle = eye_cascade.detectMultiScale(face)  # detection for eyes in the face
             for (xx, yy, ww, hh) in eyes_rectangle:
                 cv2.rectangle(face_img, (xx + x, y + yy), (x + xx + ww, y + yy + hh), (255, 0, 0), 2)  # drawing rectangle over the detected eyes
+        face_img = putIterationsPerSec(face_img, self.cps.countsPerSec())
         cv2.imshow('face detect', face_img)
+        self.cps.increment()
         return detected
 
     def __del__(self):
@@ -39,29 +73,61 @@ class playvideo:
         self.movie = cv2.VideoCapture(path)
         self.fps = self.movie.get(cv2.CAP_PROP_FPS)
         self.play = True
+        self.cps = CountsPerSec().start()
 
     def playthevideo(self):
         ret, frame = self.movie.read()
+        frame = putIterationsPerSec(frame, self.cps.countsPerSec())
         cv2.imshow('movie', frame)
+        self.cps.increment()
 
     def __del__(self):
         self.movie.release()
 
 
+class VideoGet:
+    """
+    Class that continuously gets frames from a VideoCapture object
+    with a dedicated thread.
+    """
+
+    def __init__(self, src=0):
+        self.stream = cv2.VideoCapture(src)
+        (self.grabbed, self.frame) = self.stream.read()
+        self.stopped = False
+
+    def start(self):
+        Thread(target=self.get, args=()).start()
+        return self
+
+    def get(self):
+        while not self.stopped:
+            if not self.grabbed:
+                self.stop()
+            else:
+                (self.grabbed, self.frame) = self.stream.read()
+
+    def stop(self):
+        self.stopped = True
+
+
 seconds = time.time()
+
 
 def foo(path):
     wb = webcam()
-    mv = playvideo('/home/devil/Downloads/video.mp4')
-
+    mv = playvideo(path)
+    vg = VideoGet(path)
+    global seconds
     while True:
-        flag = wb.detect_face()
+        #flag = wb.detect_face()
+        flag=True
         if flag and mv.play:
-            global seconds
-            mv.playthevideo()
+            #mv.playthevideo()
+            vg.start()
             seconds = time.time()
 
-        usr = cv2.waitKey(int(1000 / (1.5 * mv.fps)))
+        usr = cv2.waitKey(int(1000 / mv.fps))
         if usr == 32:  # if the user presses the "space"
             mv.play = not mv.play
         if usr == 27 or time.time() - seconds >= 30:  # if the user presses the "esc" key or don't look at screen for a specific time then player stops
@@ -69,5 +135,6 @@ def foo(path):
     del wb
     del mv
     cv2.destroyAllWindows()
+
 
 foo('/home/devil/Downloads/video.mp4')
