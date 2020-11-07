@@ -27,7 +27,7 @@ class VideoGet:
         while not self.stopped:
             g, f = self.movie.read()
             if not g:
-                self.stop()
+                break
             else:
                 self.frame.append(f)
                 self.grabbed.append(g)
@@ -37,9 +37,13 @@ class VideoGet:
             g = self.grabbed.popleft()
             f = self.frame.popleft()
             return g, f
+        return False, None
 
     def stop(self):
         self.stopped = True
+
+    def __del__(self):
+        self.movie.release()
 
 
 def threadVideoGet(source):
@@ -53,7 +57,7 @@ def threadVideoGet(source):
     # print(video_getter.fps)
 
     while True:
-        usr = cv2.waitKey(int(1000))
+        usr = cv2.waitKey(int(1000/video_getter.fps))
         if usr == 27 or video_getter.stopped:
             video_getter.stop()
             break
@@ -63,9 +67,13 @@ def threadVideoGet(source):
 
         grabbed, frame = video_getter.get_frame()
         # frame = putIterationsPerSec(frame, cps.countsPerSec())
+        if frame is None:
+            break
         cv2.imshow("Video", frame)
         # cps.increment()
+    del video_getter
+    cv2.destroyAllWindows()
 
 
-path = '/home/devil/Downloads/video.mp4'
+path = '/home/devil/Downloads/Wahi_360.mp4'
 threadVideoGet(path)

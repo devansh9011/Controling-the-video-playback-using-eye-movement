@@ -85,46 +85,18 @@ class playvideo:
         self.movie.release()
 
 
-class VideoGet:
-    """
-    Class that continuously gets frames from a VideoCapture object
-    with a dedicated thread.
-    """
-
-    def __init__(self, src=0):
-        self.stream = cv2.VideoCapture(src)
-        (self.grabbed, self.frame) = self.stream.read()
-        self.stopped = False
-
-    def start(self):
-        Thread(target=self.get, args=()).start()
-        return self
-
-    def get(self):
-        while not self.stopped:
-            if not self.grabbed:
-                self.stop()
-            else:
-                (self.grabbed, self.frame) = self.stream.read()
-
-    def stop(self):
-        self.stopped = True
-
-
 seconds = time.time()
 
 
 def foo(path):
     wb = webcam()
     mv = playvideo(path)
-    vg = VideoGet(path)
     global seconds
     while True:
         #flag = wb.detect_face()
         flag=True
         if flag and mv.play:
             #mv.playthevideo()
-            vg.start()
             seconds = time.time()
 
         usr = cv2.waitKey(int(1000 / mv.fps))
