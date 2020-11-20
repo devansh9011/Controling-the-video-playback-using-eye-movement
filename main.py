@@ -91,12 +91,13 @@ seconds = time.time()
 def foo(path):
     wb = webcam()
     mv = playvideo(path)
+
     global seconds
     while True:
         #flag = wb.detect_face()
         flag=True
         if flag and mv.play:
-            #mv.playthevideo()
+            mv.playthevideo()
             seconds = time.time()
 
         usr = cv2.waitKey(int(1000 / mv.fps))

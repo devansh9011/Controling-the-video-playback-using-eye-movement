@@ -1,195 +1,73 @@
-import os
-import time
-import wx
-import MplayerCtrl as mpc
-import wx.lib.buttons as buttons
-
-dirName = os.path.dirname(os.path.abspath(__file__))
-bitmapDir = os.path.join(dirName, 'bitmaps')
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
 
 
-class Frame(wx.Frame):
+class ApplicationWindow(Gtk.Window):
 
-    # ----------------------------------------------------------------------
-    def __init__(self, parent, id, title, mplayer):
-        wx.Frame.__init__(self, parent, id, title)
-        self.panel = wx.Panel(self)
+    def __init__(self):
+        Gtk.Window.__init__(self, title="Python-Vlc Media Player")
+        self.playback_button = Gtk.Button()
+        self.stop_button = Gtk.Button()
 
-        sp = wx.StandardPaths.Get()
-        self.currentFolder = sp.GetDocumentsDir()
-        self.currentVolume = 50
-
-        self.create_menu()
-
-        # create sizers
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
-        controlSizer = self.build_controls()
-        sliderSizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        self.mplayer = mpc.MplayerCtrl(self.panel, -1, mplayer)
-        self.playbackSlider = wx.Slider(self.panel, size=wx.DefaultSize)
-        sliderSizer.Add(self.playbackSlider, 1, wx.ALL | wx.EXPAND, 5)
-
-        # create volume control
-        self.volumeCtrl = wx.Slider(self.panel)
-        self.volumeCtrl.SetRange(0, 100)
-        self.volumeCtrl.SetValue(self.currentVolume)
-        self.volumeCtrl.Bind(wx.EVT_SLIDER, self.on_set_volume)
-        controlSizer.Add(self.volumeCtrl, 0, wx.ALL, 5)
-
-        # create track counter
-        self.trackCounter = wx.StaticText(self.panel, label="00:00")
-        sliderSizer.Add(self.trackCounter, 0, wx.ALL | wx.CENTER, 5)
-
-        # set up playback timer
-        self.playbackTimer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.on_update_playback)
-
-        mainSizer.Add(self.mplayer, 1, wx.ALL | wx.EXPAND, 5)
-        mainSizer.Add(sliderSizer, 0, wx.ALL | wx.EXPAND, 5)
-        mainSizer.Add(controlSizer, 0, wx.ALL | wx.CENTER, 5)
-        self.panel.SetSizer(mainSizer)
-
-        self.Bind(mpc.EVT_MEDIA_STARTED, self.on_media_started)
-        self.Bind(mpc.EVT_MEDIA_FINISHED, self.on_media_finished)
-        self.Bind(mpc.EVT_PROCESS_STARTED, self.on_process_started)
-        self.Bind(mpc.EVT_PROCESS_STOPPED, self.on_process_stopped)
-
-        self.Show()
-        self.panel.Layout()
-
-    # ----------------------------------------------------------------------
-    def build_btn(self, btnDict, sizer):
-        """"""
-        bmp = btnDict['bitmap']
-        handler = btnDict['handler']
-
-        img = wx.Bitmap(os.path.join(bitmapDir, bmp))
-        btn = buttons.GenBitmapButton(self.panel, bitmap=img,
-                                      name=btnDict['name'])
-        btn.SetInitialSize()
-        btn.Bind(wx.EVT_BUTTON, handler)
-        sizer.Add(btn, 0, wx.LEFT, 3)
-
-    # ----------------------------------------------------------------------
-    def build_controls(self):
-        """
-        Builds the audio bar controls
-        """
-        controlSizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        btnData = [{'bitmap': 'player_pause.png',
-                    'handler': self.on_pause, 'name': 'pause'},
-                   {'bitmap': 'player_stop.png',
-                    'handler': self.on_stop, 'name': 'stop'}]
-        for btn in btnData:
-            self.build_btn(btn, controlSizer)
-
-        return controlSizer
-
-    # ----------------------------------------------------------------------
-    def create_menu(self):
-        """
-        Creates a menu
-        """
-        menubar = wx.MenuBar()
-        fileMenu = wx.Menu()
-        add_file_menu_item = fileMenu.Append(wx.NewId(), "&Add File", "Add Media File")
-        menubar.Append(fileMenu, '&File')
-
-        self.SetMenuBar(menubar)
-        self.Bind(wx.EVT_MENU, self.on_add_file, add_file_menu_item)
-
-    # ----------------------------------------------------------------------
-    def on_add_file(self, event):
-        """
-        Add a Movie and start playing it
-        """
-        wildcard = "Media Files (*.*)|*.*"
-        dlg = wx.FileDialog(
-            self, message="Choose a file",
-            defaultDir=self.currentFolder,
-            defaultFile="",
-            wildcard=wildcard,
-            style=wx.OPEN | wx.CHANGE_DIR
+        self.play_image = Gtk.Image.new_from_icon_name(
+            "gtk-media-play",
+            Gtk.IconSize.MENU
         )
-        if dlg.ShowModal() == wx.ID_OK:
-            path = dlg.GetPath()
-            self.currentFolder = os.path.dirname(path[0])
-            trackPath = '"%s"' % path.replace("\\", "/")
-            self.mplayer.Loadfile(trackPath)
+        self.pause_image = Gtk.Image.new_from_icon_name(
+            "gtk-media-pause",
+            Gtk.IconSize.MENU
+        )
+        self.stop_image = Gtk.Image.new_from_icon_name(
+            "gtk-media-stop",
+            Gtk.IconSize.MENU
+        )
+        self.playback_button.set_image(self.play_image)
+        self.stop_button.set_image(self.stop_image)
 
-            t_len = self.mplayer.GetTimeLength()
-            self.playbackSlider.SetRange(0, t_len)
-            self.playbackTimer.Start(100)
+        self.playback_button.connect("clicked", self.toggle_player_playback)
+        self.stop_button.connect("clicked", self.stop_player)
 
-    # ----------------------------------------------------------------------
-    def on_media_started(self, event):
-        print
-        'Media started!'
+    def toggle_player_playback(self, widget, data=None):
 
-    # ----------------------------------------------------------------------
-    def on_media_finished(self, event):
-        print
-        'Media finished!'
-        self.playbackTimer.Stop()
+        """
+        Handler for Player's Playback Button (Play/Pause).
+        """
 
-    # ----------------------------------------------------------------------
-    def on_pause(self, event):
-        """"""
-        if self.playbackTimer.IsRunning():
-            print
-            "pausing..."
-            self.mplayer.Pause()
-            self.playbackTimer.Stop()
+        if self.is_player_active == False and self.player_paused == False:
+            self.player.play()
+            self.playback_button.set_image(self.pause_image)
+            self.is_player_active = True
+
+        elif self.is_player_active == True and self.player_paused == True:
+            self.player.play()
+            self.playback_button.set_image(self.pause_image)
+            self.player_paused = False
+
+        elif self.is_player_active == True and self.player_paused == False:
+            self.player.pause()
+            self.playback_button.set_image(self.play_image)
+            self.player_paused = True
         else:
-            print
-            "unpausing..."
-            self.mplayer.Pause()
-            self.playbackTimer.Start()
+            pass
 
-    # ----------------------------------------------------------------------
-    def on_process_started(self, event):
-        print
-        'Process started!'
+    def stop_player(self, widget, data=None):
+        self.player.stop()
+        self.is_player_active = False
+        self.playback_button.set_image(self.play_image)
+        self.draw_area = Gtk.DrawingArea()
+        self.draw_area.set_size_request(300, 300)
+        self.draw_area.connect("realize", self._realized)
 
-    # ----------------------------------------------------------------------
-    def on_process_stopped(self, event):
-        print
-        'Process stopped!'
+        self.hbox = Gtk.Box(spacing=6)
+        self.hbox.pack_start(self.playback_button, True, True, 0)
+        self.hbox.pack_start(self.stop_button, True, True, 0)
 
-    # ----------------------------------------------------------------------
-    def on_set_volume(self, event):
-        """
-        Sets the volume of the music player
-        """
-        self.currentVolume = self.volumeCtrl.GetValue()
-        self.mplayer.SetProperty("volume", self.currentVolume)
+        self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.add(self.vbox)
+        self.vbox.pack_start(self.draw_area, True, True, 0)
+        self.vbox.pack_start(self.hbox, False, False, 0)
 
-    # ----------------------------------------------------------------------
-    def on_stop(self, event):
-        """"""
-        print
-        "stopping..."
-        self.mplayer.Stop()
-        self.playbackTimer.Stop()
+        self.show_all()
 
-    # ----------------------------------------------------------------------
-    def on_update_playback(self, event):
-        """
-        Updates playback slider and track counter
-        """
-        try:
-            offset = self.mplayer.GetTimePos()
-        except:
-            return
-        print
-        offset
-        mod_off = str(offset)[-1]
-        if mod_off == '0':
-            print
-            "mod_off"
-            offset = int(offset)
-            self.playbackSlider.SetValue(offset)
-            secsPlayed = time.strftime('%M:%S', time.gmtime(offset))
-            self.trackCounter.SetLabel(secsPlayed)
+
