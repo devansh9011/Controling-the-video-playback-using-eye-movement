@@ -33,7 +33,7 @@ class webcam:
         self.cap.release()
 
 
-class playvideo:
+class PlayVideo:
     def __init__(self, path):
         self.movie = cv2.VideoCapture(path)
         self.fps = self.movie.get(cv2.CAP_PROP_FPS)
@@ -52,7 +52,7 @@ seconds = time.time()
 
 def foo(path):
     wb = webcam()
-    mv = playvideo(path)
+    mv = PlayVideo(path)
 
     global seconds
     while True:
